@@ -13,6 +13,11 @@ test suite through its own generic executor.
   and re-exports THIS file via the harness's `_agentops_bootstrap` (which
   auto-provisions this public peer if the sibling clone is missing). Edit here;
   there is no second copy to keep in sync.
+- `winos.py` — **CANONICAL as of Phase 4 (2026-07-22):** stdlib-only Win32/
+  process primitives (hidden subprocess, integrity, foreground, process scan).
+  The harness `winos.py` is a shim loading this AS `sys.modules['winos']`
+  (module self-replacement, so fixtures monkeypatching `winos.<fn>` work). A
+  clean framework peer — no harness/Stellaris knowledge.
 - `queue_protocol.py` — **CANONICAL as of Phase 4c (2026-07-22):** THE git
   queue protocol (claim / race_push / publish_retry / push_or_rollback / three
   pull disciplines / yield / requeue / archive / commit_result / cancel). The
