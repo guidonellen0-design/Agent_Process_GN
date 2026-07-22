@@ -13,8 +13,13 @@ test suite through its own generic executor.
   and re-exports THIS file via the harness's `_agentops_bootstrap` (which
   auto-provisions this public peer if the sibling clone is missing). Edit here;
   there is no second copy to keep in sync.
-- `queue_protocol.py` — NOT here yet; it stays in the harness until its Phase-4
-  alias increment (same shim pattern as profile_runtime).
+- `queue_protocol.py` — **CANONICAL as of Phase 4c (2026-07-22):** THE git
+  queue protocol (claim / race_push / publish_retry / push_or_rollback / three
+  pull disciplines / yield / requeue / archive / commit_result / cancel). The
+  harness `queue_protocol.py` is a shim re-exporting this via
+  `_agentops_bootstrap`. Note: `git_run()` imports `winos` (a generic stdlib
+  Windows util still in the harness), so this module is loaded only in a harness
+  context for now; relocating `winos` (7 harness importers) is a follow-up.
 - `generic_executor.py` — project-agnostic: resolve a profile → run approved
   commands in a sanitized environment → grade → schema-v2 result envelope.
 - `registry.py` + `registry.json` — the evolved (v2) project registry
