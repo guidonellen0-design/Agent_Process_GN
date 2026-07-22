@@ -12,9 +12,17 @@ Phase 1). This module is the single implementation of:
   - lightweight validation for .agentops/project.json and checks.json
     (mirrors schemas/*.schema.json; no external jsonschema dependency).
 
-Phase 4 relocates this file to _agent_process/profile_runtime/; until then
-the harness is its home. Both execution lanes (local skill, farm worker)
-must call THESE functions — never a second interpretation of checks.json.
+CANONICAL HOME: this harness copy. _agent_process/profile_runtime.py is a
+byte-copy MIRROR — edit HERE, then re-sync the mirror; the harness suite's
+"profile_runtime.py byte-identical" guard (test_runner_parse.py, generic-route)
+fails the build on any drift (retires gotcha 6). Phase 4's plan RELOCATES the
+canonical to _agent_process and makes the harness import it from there, but that
+flip is GATED: it turns the PRIVATE _agent_process peer into a hard import-time
+dependency of every runner start and every stella verb (stella_queue imports
+this too), and a worker that cannot clone a private repo (rig, gh unauth) would
+brick on restart. It lands once peer presence is guaranteed on every worker
+(provisioning / Phase 8). Both execution lanes (local skill, farm worker) must
+call THESE functions — never a second interpretation of checks.json.
 
 No Stellaris knowledge lives here (§4.3 boundary): no install paths, no
 playsets, no coordinates, no tiers beyond opaque strings.
