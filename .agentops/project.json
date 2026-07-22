@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "project_id": "agentops-core",
+  "adapter_id": "generic-command",
+  "display_name": "Agent Process core",
+  "description": "The reusable agent-ops framework, dogfooding itself as the first non-Stellaris pilot project (design doc §13 Phase 3). Its checks run the framework's own Python test suite.",
+  "required_capabilities": ["git", "python"],
+  "policy": {
+    "allow_network": false,
+    "sanitize_environment": true,
+    "preserve_failed_worktree": false
+  },
+  "checks_path": ".agentops/checks.json"
+}

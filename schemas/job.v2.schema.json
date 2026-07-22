@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentops/job.v2.schema.json",
+  "title": "Queue job envelope, schema v2 (additive over v1)",
+  "description": "Governs jobs/<id>.json. V1 (legacy) jobs have NO schema_version key and keep their existing behavior verbatim: checklist authoritative, project_id derived in memory from repo, adapter_id defaults to stellaris-game. V2 adds identity/profile/routing fields; every v1 field keeps its name and meaning forever (design doc 5.1). Readers tolerate unknown fields; queue files are never rewritten to migrate.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "id", "tier", "repo", "project_id", "job_type", "adapter_id"],
+  "properties": {
+    "schema_version": { "const": 2 },
+
+    "id": {
+      "type": "string",
+      "pattern": "^\\d{8}T\\d{6}_[A-Za-z0-9][A-Za-z0-9_-]*$",
+      "description": "UTC-stamped job id; requeue successors get an r-number suffix and a fresh stamp; ids are never reused."
+    },
+    "tier": {
+      "type": "string",
+      "description": "Scheduling class. Known values: tier1, gui, restore, bootstrap. Preserved v1 field; scheduling invariants (Tier-1-before-gui, 90s yield) key off it."
+    },
+    "repo": {
+      "type": "string",
+      "description": "Preserved v1 field. V2 jobs also carry project_id; the worker verifies the two correspond through the registry (design doc 3.5)."
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "Pinned commit the worker checks out (detached). Requeue sha-drift rules apply."
+    },
+    "checklist": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "V1: authoritative test instructions. V2: a RENDERED SNAPSHOT of the effective profile (compatibility + human-readable); profile + hash are authoritative; snapshot/hash mismatch = infrastructure failure (design doc 5.3)."
+    },
+    "timeout_minutes": { "type": "number", "exclusiveMinimum": 0 },
+    "requested_by": { "type": "string" },
+    "note": { "type": "string" },
+    "dispatch": { "type": "string", "description": "gui dispatch mode: direct (default) or agent." },
+    "playset": { "type": "string", "description": "Stellaris-adapter field (mod/<X>.mod)." },
+    "created_at": { "type": "string" },
+
+    "project_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$",
+      "description": "Registry key; must correspond to repo via known-mod-repos.json (evolved registry)."
+    },
+    "job_type": {
+      "type": "string",
+      "description": "Known values: automated-check (generic profile run), stellaris-test (Tier-1 transaction), stellaris-gui (Tier-2 checklist), restore, bootstrap. Open set."
+    },
+    "adapter_id": {
+      "type": "string",
+      "description": "Known values: stellaris-game, generic-command. Workers refuse jobs whose adapter they lack (pre-claim eligibility)."
+    },
+    "project_config_revision": {
+      "type": "string",
+      "description": "Revision the .agentops files resolve from. Normally equals commit_sha; a different value is permitted only when configuration deliberately lives outside the tested commit (design doc 5.2)."
+    },
+    "check_profile": {
+      "type": "string",
+      "description": "Profile name in the project's checks.json. Authoritative for v2 jobs."
+    },
+    "profile_parameters": {
+      "type": "object",
+      "description": "Typed parameters the profile declares; undeclared keys are a profile-resolution failure."
+    },
+    "effective_profile_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "sha256 over the CANONICAL serialization of the effective profile (project id, pinned revision, profile name, base profile contents, typed parameters, amendments) — profile_runtime.effective_profile_hash. Recorded again in the result; submit-time vs run-time mismatch = profile-resolution failure."
+    },
+    "amendments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["tier", "applied_by", "applied_at"],
+        "properties": {
+          "tier": {
+            "enum": ["append-step", "field"],
+            "description": "Tier 1 append-only step or tier 2 declared-field amendment. There is deliberately no 'replace' value (tier 3: never)."
+          },
+          "step": { "type": "string", "description": "append-step: the appended checklist/command step text." },
+          "field": { "type": "string", "description": "field: the amendable_fields key touched." },
+          "value": { "description": "field: the new value (must match the declared type)." },
+          "applied_by": { "type": "string" },
+          "applied_at": { "type": "string" }
+        }
+      },
+      "description": "Structured amendment record (design doc 3.7). Every entry changes the effective hash and is stamped in the note for humans."
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "exclusive_resources": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "maximum_cost": { "type": "number", "exclusiveMinimum": 0, "description": "USD ceiling for the run (enforced job ceiling, design doc 12)." }
+      }
+    },
+    "priority": {
+      "type": "string",
+      "default": "normal",
+      "description": "Ordering WITHIN a scheduling class (tier); never overrides tier order. Known values: low, normal, high."
+    }
+  }
+}

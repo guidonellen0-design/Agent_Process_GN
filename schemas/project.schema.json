@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentops/project.schema.json",
+  "title": "AgentOps project manifest (.agentops/project.json)",
+  "description": "Identity and policy for a project participating in agent-ops. Lives IN the tested repo, so its revision normally equals the tested commit (design doc 5.2). No secrets, no machine paths (those live in machine-local *.local sidecars).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "project_id", "adapter_id"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$",
+      "description": "Stable project identity; must match the registry key in known-mod-repos.json (evolved registry, design doc 3.5)."
+    },
+    "adapter_id": {
+      "type": "string",
+      "description": "Executor adapter. Known values today: 'generic-command', 'stellaris-game'. Open set — workers refuse jobs whose adapter they lack."
+    },
+    "display_name": { "type": "string" },
+    "description": { "type": "string" },
+    "required_capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Machine capabilities every profile of this project needs (e.g. git, python). Per-profile additions live in checks.json."
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Project execution policy. Enforcement honesty rule (design doc 3.9): requested-but-unenforceable isolation is REPORTED in the result isolation block, never silently dropped.",
+      "properties": {
+        "allow_network": {
+          "type": "boolean",
+          "default": false,
+          "description": "Declarative until an enforcement mechanism exists (design doc 3.9)."
+        },
+        "sanitize_environment": {
+          "type": "boolean",
+          "default": true,
+          "description": "Child process gets a sanitized environment: no queue git credentials, webhook values, baton/auth paths, unrelated project secrets."
+        },
+        "preserve_failed_worktree": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep the isolated worktree after a failing run for diagnosis instead of cleaning it."
+        }
+      }
+    },
+    "checks_path": {
+      "type": "string",
+      "default": ".agentops/checks.json",
+      "description": "Relative path to the check-profile file; override only when configuration deliberately lives elsewhere (recorded, design doc 5.2)."
+    }
+  }
+}

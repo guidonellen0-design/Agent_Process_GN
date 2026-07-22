@@ -1,0 +1,21 @@
+{
+  "_readme": [
+    "The evolved multi-project registry (design doc §3.5) — known-mod-repos.json's",
+    "v2 successor. PROJECT-SESSION-WRITABLE (baton-exempt): onboarding a project",
+    "never requires the design master. No secrets, no machine paths (those live in",
+    "machine-local *.local sidecars mapping project_id -> clone path/creds).",
+    "Phase 3: this is the skeleton's canonical registry; the harness keeps its",
+    "legacy flat known-mod-repos.json until Phase 4 merges them. Readers already",
+    "accept both shapes (profile_runtime._registry_corresponds)."
+  ],
+  "schema_version": 2,
+  "projects": {
+    "agentops-core": {
+      "repo": "_agent_process",
+      "remote": "https://github.com/guidonellen0-design/Agent_Process_GN.git",
+      "adapter_id": "generic-command",
+      "manifest_path": ".agentops/project.json",
+      "checks_path": ".agentops/checks.json"
+    }
+  }
+}

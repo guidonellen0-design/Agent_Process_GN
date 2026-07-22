@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentops/checks.schema.json",
+  "title": "AgentOps check profiles (.agentops/checks.json)",
+  "description": "The versioned recipe cards: a job names a profile; this file maps it to approved commands, timeouts and grading (design doc 3.6). Jobs never carry agent-authored shell text. Amendments obey the three-tier rules (3.7): appends always, declared fields only, replacement never.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "checks"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "checks": {
+      "type": "object",
+      "description": "Profile name -> profile. Names are job-referencable identifiers.",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["commands", "grading"],
+        "properties": {
+          "timeout_minutes": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Total profile timeout; the executor's clamp rules still apply."
+          },
+          "commands": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Approved commands, executed in order. NOT amendable (tier 3: replacement never). A material change is a commit to this file and a new job."
+          },
+          "grading": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Known values today: 'exit-code' (first command's exit status), 'all-commands-pass' (every command must exit 0). Open set; core grading rules are NOT amendable."
+              }
+            }
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Capabilities this profile needs beyond the project-level set."
+          },
+          "exclusive_resources": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Exclusive resources (e.g. 'stellaris-game@host', 'interactive-desktop@host' classes) the run must lease."
+          },
+          "evidence": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Paths/globs (relative to the worktree) collected as evidence."
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["type"],
+              "properties": {
+                "type": { "enum": ["string", "number", "boolean", "array", "object"] },
+                "default": {},
+                "description": { "type": "string" }
+              }
+            },
+            "description": "Typed parameters a job may supply via profile_parameters; undeclared parameters are a profile-resolution failure."
+          },
+          "amendable_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["type"],
+              "properties": {
+                "type": { "enum": ["string", "number", "boolean", "array", "object"] },
+                "description": { "type": "string" }
+              }
+            },
+            "description": "Tier-2 declaration: ONLY fields named here (e.g. coordinates, operator_notes, expected_labels) accept field-level amendments. 'commands' and 'grading' are never valid entries (tier 3). Tier-1 append-only step amendments need no declaration — they are always permitted."
+          }
+        }
+      }
+    }
+  }
+}

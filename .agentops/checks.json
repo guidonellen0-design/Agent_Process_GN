@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "checks": {
+    "fast": {
+      "timeout_minutes": 5,
+      "commands": ["python tests/run_tests.py --fast"],
+      "grading": { "type": "exit-code" },
+      "required_capabilities": ["python"],
+      "evidence": ["tests/run_tests.py"]
+    },
+    "full": {
+      "timeout_minutes": 10,
+      "commands": [
+        "python tests/run_tests.py",
+        "python -m py_compile profile_runtime.py registry.py generic_executor.py"
+      ],
+      "grading": { "type": "all-commands-pass" },
+      "required_capabilities": ["python"],
+      "amendable_fields": {
+        "operator_notes": { "type": "string", "description": "free-text run note; does not change commands or grading" }
+      }
+    }
+  }
+}

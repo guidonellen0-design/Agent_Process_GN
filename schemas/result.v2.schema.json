@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentops/result.v2.schema.json",
+  "title": "Queue result envelope, schema v2 (additive over v1)",
+  "description": "Governs results/<id>.json. V1 results (no schema_version key) keep every field verbatim: common fields (job_note, id, host, keepawake_until, steam_mode, finished_at, tier, queued_at, claimed_at, queue_wait_s, run_s), tier1 fields (verdict GREEN/FAIL/REFUSED, status_line, evidence, userdir, isolation, launcher_divergence, steam_mode_before, locked_at_start/end, failed_rules, failure_class), gui fields (verdict COMPLETED/DISPATCH_ERROR/CANCELLED, checks_verdict, failure_class, probe_candidate, status_line, verdict_text(+_file), cost_usd, dispatch_mode, dispatch_events, gui_metrics, checklist(+_ref), preflight_foreground, idle_extensions), plus requeued_as (the ONE sanctioned post-publish mutation), duplicate_of, auto-retry stamps. V2 adds identity/profile/lane/status-taxonomy fields. Additive only; readers select by name; results are never overwritten (dup-naming preserved).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "id", "verdict"],
+  "properties": {
+    "schema_version": { "const": 2 },
+
+    "project_id": { "type": "string" },
+    "adapter_id": { "type": "string" },
+    "adapter_version": { "type": "string" },
+    "machine": {
+      "type": "string",
+      "description": "Alias of v1 'host' for the generic envelope; both carry the executing hostname. v1 'host' stays authoritative for legacy readers."
+    },
+    "commit_sha": { "type": "string" },
+    "project_config_revision": { "type": "string" },
+    "check_profile": { "type": "string" },
+    "effective_profile_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Recomputed at run time by the profile runtime; MUST equal the job's submit-time hash or the run is a profile-resolution failure."
+    },
+    "execution_lane": { "enum": ["local", "farm"] },
+    "status": {
+      "enum": [
+        "test-failure",
+        "infrastructure-failure",
+        "cancellation",
+        "timeout",
+        "adapter-failure",
+        "cleanup-failure",
+        "restoration-failure",
+        "unsupported-machine",
+        "unroutable-job",
+        "budget-refusal",
+        "authorization-refusal",
+        "profile-resolution-failure",
+        "isolation-policy-failure",
+        "success"
+      ],
+      "description": "The v2 failure taxonomy (design doc 5.4). Distinct from 'verdict' (which keeps its v1 per-tier vocabulary). A passing verdict never hides incomplete cleanup or restoration: if cleanup/restoration failed, status MUST say so even when checks passed."
+    },
+    "per_check": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["name", "status"],
+        "properties": {
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "exit_code": { "type": "number" },
+          "duration_s": { "type": "number" },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Recorded environment differences (lane equivalence permits differing environments but requires reporting them)."
+    },
+    "isolation_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "What isolation was ACTUALLY enforced (design doc 3.9's isolation block). Requested-but-unenforceable isolation is reported here, never silently dropped. Deliberately NOT named 'isolation': v1 tier1 results already use that key as a STRING (HONORED/IGNORED/AMBIGUOUS) and existing keys are never re-typed — the v1 field stays untouched on Stellaris results.",
+      "properties": {
+        "environment_sanitized": { "type": "boolean" },
+        "queue_credentials_exposed": { "type": "boolean" },
+        "network_policy": {
+          "type": "object",
+          "properties": {
+            "declared": { "type": "boolean" },
+            "enforced": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "policy_revision": { "type": "string" },
+    "amendments_applied": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "The structured amendments that entered the effective hash (same shape as job.amendments)."
+    },
+    "cleanup_status": { "type": "string" },
+    "restoration_status": { "type": "string" }
+  }
+}
