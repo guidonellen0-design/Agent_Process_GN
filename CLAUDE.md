@@ -8,10 +8,13 @@ test suite through its own generic executor.
 
 ## What lives here (Phase 3 scope)
 - `profile_runtime.py` — the ONE profile resolver + canonical hashing +
-  three-tier amendments + schema validation (canonical copy; the harness
-  keeps a copy until **Phase 4** makes the harness *alias* this one — do not
-  let the two drift in the meantime).
-- `queue_protocol.py` — NOT here yet; it stays in the harness until Phase 4.
+  three-tier amendments + schema validation. **CANONICAL as of Phase 4
+  (2026-07-22):** the harness `profile_runtime.py` is now a shim that imports
+  and re-exports THIS file via the harness's `_agentops_bootstrap` (which
+  auto-provisions this public peer if the sibling clone is missing). Edit here;
+  there is no second copy to keep in sync.
+- `queue_protocol.py` — NOT here yet; it stays in the harness until its Phase-4
+  alias increment (same shim pattern as profile_runtime).
 - `generic_executor.py` — project-agnostic: resolve a profile → run approved
   commands in a sanitized environment → grade → schema-v2 result envelope.
 - `registry.py` + `registry.json` — the evolved (v2) project registry
