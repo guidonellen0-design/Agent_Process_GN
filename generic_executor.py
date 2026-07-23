@@ -136,6 +136,36 @@ def _grade(grading, per_check):
 CANCEL_POLL_S = 5     # how often a running command re-asks should_cancel()
 
 
+def job_timeout_problem(job):
+    """The TIMEOUT translation (Phase 5, 2026-07-23). Returns a problem string
+    if this generic job carries a job-level `timeout_minutes`, else None.
+
+    A Stellaris job may override its own total budget — that adapter's timeout
+    is a property of the RUN. A generic job may not, because here the timeout
+    is a property of the RECIPE: `timeout_minutes` lives in checks.json and is
+    therefore inside `effective_profile_hash` (the hash covers the whole base
+    profile, §3.7). Honouring a job-level override would change what actually
+    ran WITHOUT changing the identity of what ran — precisely the drift the
+    hash exists to detect.
+
+    Until now the field was accepted by validation and then silently dropped:
+    a requester who set it believed they had capped the burn and had not. That
+    is the worst of the three options. The other two are honouring it (breaks
+    the hash contract) and refusing it (this) — and refusing is not a dead end,
+    because the sanctioned route already exists: a profile that declares
+    `timeout_minutes` in `amendable_fields` can be amended per job, and a
+    tier-2 amendment IS part of the hash."""
+    if not (job or {}).get("timeout_minutes"):
+        return None
+    return ("generic-command jobs cannot set job-level timeout_minutes: the "
+            "timeout belongs to the check profile and is inside "
+            "effective_profile_hash, so a job override would change the run "
+            "without changing its identity. Either change timeout_minutes in "
+            "the project's checks.json (a new commit, new hash), or declare it "
+            "in that profile's amendable_fields and pass it as a field "
+            "amendment — an amendment is hashed, so the identity stays honest.")
+
+
 def _run_one(command, cwd, env, timeout_s, tail_bytes=4000,
              should_cancel=None, poll_s=CANCEL_POLL_S):
     """Run one approved command string in `cwd` under `env`. shell=True: the

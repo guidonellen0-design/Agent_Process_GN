@@ -371,6 +371,40 @@ check("budget", "healthy accounting reports no problem",
                          "parse_failures": 0}) is None)
 
 
+# --- timeout translation (Phase 5, 2026-07-23) -----------------------------
+# A generic job's timeout belongs to the RECIPE, not the run: timeout_minutes
+# lives in checks.json and is therefore inside effective_profile_hash. Before
+# this the field was validated as a number and then silently dropped, so a
+# requester who set it believed they had capped the burn and had not.
+check("timeout", "a generic job with no timeout_minutes is fine",
+      ge.job_timeout_problem({"project_id": "p"}) is None)
+check("timeout", "timeout_minutes 0 / absent / null are all 'not set'",
+      ge.job_timeout_problem({"timeout_minutes": 0}) is None
+      and ge.job_timeout_problem({"timeout_minutes": None}) is None
+      and ge.job_timeout_problem({}) is None)
+_tp = ge.job_timeout_problem({"timeout_minutes": 5})
+check("timeout", "a job-level timeout_minutes is REFUSED, never dropped",
+      _tp and "cannot set job-level timeout_minutes" in _tp)
+check("timeout", "the refusal names the sanctioned route (amendable_fields)",
+      "amendable_fields" in _tp and "amendment" in _tp,
+      "a refusal with no way forward is a dead end")
+check("timeout", "the refusal explains WHY (the hash would not change)",
+      "effective_profile_hash" in _tp)
+# the reason the rule exists: timeout_minutes is inside the identity
+_p_a = {"commands": ["x"], "grading": {"type": "exit-code"}, "timeout_minutes": 5}
+_p_b = dict(_p_a, timeout_minutes=50)
+check("timeout", "changing a profile's timeout DOES change the hash",
+      pr.effective_profile_hash("p", "r", "f", _p_a)
+      != pr.effective_profile_hash("p", "r", "f", _p_b),
+      "if this ever stops being true, the whole rule is pointless")
+check("timeout", "a field AMENDMENT also changes the hash (the way through)",
+      pr.effective_profile_hash("p", "r", "f", _p_a)
+      != pr.effective_profile_hash(
+          "p", "r", "f", _p_a,
+          amendments=[{"tier": "field", "field": "timeout_minutes",
+                       "value": 50}]))
+
+
 # --- farm-lane cancellation (Phase 5, 2026-07-23; gap G4's other half) -----
 # A generic job used to run to its timeout no matter what: gui dispatch has
 # honored cancel markers since Phase 2, the farm lane never did. The executor
