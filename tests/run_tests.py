@@ -12,6 +12,7 @@ import sys
 import tempfile
 import json
 import shutil
+import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
@@ -20,6 +21,7 @@ sys.path.insert(0, _ROOT)
 import profile_runtime as pr          # noqa: E402
 import registry as reg                # noqa: E402
 import generic_executor as ge         # noqa: E402
+import budget_core as bc              # noqa: E402
 
 FAST = "--fast" in sys.argv[1:]
 RESULTS = []
@@ -253,6 +255,119 @@ def _exec_e2e():
               f"{rl['effective_profile_hash']} vs {rfarm['effective_profile_hash']}")
     finally:
         shutil.rmtree(wd, ignore_errors=True)
+
+
+# --- budget_core (Phase 4 extraction, 2026-07-23) --------------------------
+# The accounting engine behind the harness budget_guard hook. Pure functions
+# only here; the hook's end-to-end behaviour is fixtured on the adapter side.
+_bcfg = dict(bc.DEFAULT_CONFIG)
+_bst = bc.new_state()
+_line = json.dumps({"message": {"model": "claude-opus-4-8", "usage": {
+    "input_tokens": 100, "cache_creation_input_tokens": 100,
+    "cache_read_input_tokens": 100, "output_tokens": 100}}})
+_btmp = tempfile.mkdtemp()
+try:
+    _tp = os.path.join(_btmp, "t.jsonl")
+    with open(_tp, "w", encoding="utf-8") as _f:
+        _f.write(_line + "\n")
+    _off, _prob = bc.read_new_usage(_tp, 0, _bcfg, _bst)
+    # 1.0*100 + 1.25*100 + 0.1*100 + 5.0*100 = 735
+    check("budget", "weighted metric matches the documented formula",
+          _prob is None and abs(_bst["weighted"] - 735.0) < 1e-6,
+          str(_bst["weighted"]))
+    check("budget", "offset advances past the consumed line",
+          _off == os.path.getsize(_tp))
+    # a partial tail is NOT consumed — the next event re-reads it whole
+    with open(_tp, "a", encoding="utf-8") as _f:
+        _f.write('{"message": {"usage": {"output_tokens": 1')
+    _off2, _ = bc.read_new_usage(_tp, _off, _bcfg, dict(_bst))
+    check("budget", "an incomplete trailing line is left for next time",
+          _off2 == _off)
+
+    # overrides: bounded and EXPIRING, or not an override at all
+    _ovd = os.path.join(_btmp, "ovr")
+    os.makedirs(_ovd)
+    def _write_ovr(sid, obj):
+        with open(os.path.join(_ovd, sid + ".json"), "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+    _write_ovr("live", {"additional_weighted_tokens": 5_000_000,
+                        "expires_at": time.time() + 3600})
+    check("budget", "a live override grants its tokens",
+          bc.load_override(_ovd, "live") == 5_000_000)
+    _write_ovr("dead", {"additional_weighted_tokens": 5_000_000,
+                        "expires_at": time.time() - 10})
+    check("budget", "an expired override grants nothing AND is deleted",
+          bc.load_override(_ovd, "dead") == 0
+          and not os.path.exists(os.path.join(_ovd, "dead.json")))
+    _write_ovr("forever", {"additional_weighted_tokens": 5_000_000})
+    check("budget", "an override with NO expiry is refused (no off switch)",
+          bc.load_override(_ovd, "forever") == 0)
+    _write_ovr("junk", {"additional_weighted_tokens": 5_000_000,
+                        "expires_at": "not-a-date"})
+    check("budget", "an unparseable expiry is refused, not trusted",
+          bc.load_override(_ovd, "junk") == 0)
+    check("budget", "no override file -> zero, never an error",
+          bc.load_override(_ovd, "absent") == 0)
+
+    # role cap off the process baton
+    _q = os.path.join(_btmp, "q", "feedback")
+    os.makedirs(_q)
+    def _baton(obj):
+        with open(os.path.join(_q, "BATON.json"), "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+    _qd = os.path.dirname(_q)
+    _baton({"session": "HOSTX/abcd1234"})
+    check("budget", "the named holder gets the role cap",
+          bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX"))
+    check("budget", "another session does not",
+          not bc.is_baton_holder(_qd, "99999999", host="HOSTX"))
+    check("budget", "holder match is host-qualified",
+          not bc.is_baton_holder(_qd, "abcd1234-rest", host="OTHERHOST"))
+    _rel = time.strftime("%Y-%m-%dT%H:%M", time.gmtime(time.time() - 600))
+    _baton({"session": "", "released_by": "HOSTX/abcd1234", "released_at": _rel})
+    check("budget", "a releasing holder keeps the cap inside the grace window",
+          bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX", cfg=_bcfg))
+    _old = time.strftime("%Y-%m-%dT%H:%M", time.gmtime(time.time() - 10 * 3600))
+    _baton({"session": "", "released_by": "HOSTX/abcd1234", "released_at": _old})
+    check("budget", "past the grace window it drops to the session cap",
+          not bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX", cfg=_bcfg))
+    _baton({"session": "", "released_by": "HOSTX/abcd1234", "released_at": "junk"})
+    check("budget", "an unreadable release stamp fails toward FINISHING the handoff",
+          bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX", cfg=_bcfg))
+finally:
+    shutil.rmtree(_btmp, ignore_errors=True)
+
+_b, _w, _p = bc.resolve_limits(_bcfg, 1e6, 0, False)
+check("budget", "session cap and its warn fraction",
+      _b == 18e6 and _w == 0.75 and "master cap" not in _p)
+_b, _w, _p = bc.resolve_limits(_bcfg, 1e6, 0, True)
+check("budget", "holder cap is higher and warns EARLIER",
+      _b == 40e6 and _w == 0.6 and "[master cap]" in _p)
+_b, _, _ = bc.resolve_limits(_bcfg, 1e6, 5e6, False)
+check("budget", "an override raises the effective budget", _b == 23e6)
+
+_ws = {"warned": False}
+check("budget", "below the warn fraction says nothing",
+      bc.warn_message(_ws, 100, 1000, 0.75, _bcfg, "x") is None)
+_m = bc.warn_message(_ws, 800, 1000, 0.75, _bcfg, "x")
+check("budget", "the early warn fires once", _m and "75%" in _m[0]
+      and bc.warn_message(_ws, 800, 1000, 0.75, _bcfg, "x") is None)
+_m = bc.warn_message(_ws, 950, 1000, 0.75, _bcfg, "x")
+check("budget", "the final warn still fires after the early one",
+      _m and "90%" in _m[0] and "/handoff-master" in _m[1])
+_ws2 = {}
+_m = bc.warn_message(_ws2, 950, 1000, 0.75, _bcfg, "x")
+check("budget", "jumping past both thresholds yields ONE message: the final",
+      _m and "90%" in _m[0]
+      and bc.warn_message(_ws2, 950, 1000, 0.75, _bcfg, "x") is None)
+
+check("budget", "a large transcript with no usage blocks is a LOUD failure",
+      bc.schema_problem({"usage_entries": 0, "offset": 500_000}))
+check("budget", "mostly-unparseable usage lines are a LOUD failure",
+      bc.schema_problem({"usage_entries": 1, "parse_failures": 50}))
+check("budget", "healthy accounting reports no problem",
+      bc.schema_problem({"usage_entries": 500, "offset": 500_000,
+                         "parse_failures": 0}) is None)
 
 
 if not FAST:

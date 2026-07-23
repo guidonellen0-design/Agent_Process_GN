@@ -41,6 +41,16 @@ test suite through its own generic executor.
   harness keeps `schemas/CONTRACTS.md` alone (gui-metrics.csv columns, Slack
   line shapes: adapter knowledge, §4.3), and a fixture fails if any schema
   reappears there.
+- `budget_core.py` — **CANONICAL as of Phase 4 (2026-07-23):** session-budget
+  accounting and attribution — the weighted metric, incremental transcript
+  ingest (main + subagent sidechains, which bill to the PARENT session),
+  bounded expiring overrides, baton-derived role caps with the release grace,
+  and the warn/stop decision. The harness `hooks/budget_guard.py` is now a
+  thin adapter owning only the hook-event wiring, its paths, and the
+  `stella restore` recovery exemption (verb names are adapter vocabulary).
+  Its two doctrines are load-bearing and must survive any edit: FAIL OPEN,
+  FAIL LOUD (broken accounting never blocks and never reports a silent
+  zero), and every escape is bounded + expiring (no global off switch).
 - `run_local.py` — the local lane: generate a local envelope, call the SAME
   generic executor as the farm lane.
 - `tests/run_tests.py` — this project's real tests (the dogfood pilot's
