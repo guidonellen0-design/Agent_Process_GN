@@ -232,16 +232,29 @@ def claim_job(queue, name, host, git=None):
     return won, queued_at
 
 
-def yield_job(queue, name, rid, yield_to, host, git=None, log=print):
-    """The gui-yield transition (Tier-1-always-first, §7.5): git mv
-    claimed/ -> jobs/, commit `yield <rid>: ...`, push_or_rollback. True =
-    the yield is recorded on origin (caller ends the cycle; next cycle
-    claims the Tier-1). False = origin unreachable/refusing: the rollback
-    restored the CLAIM, and the caller proceeds to run the gui job rather
-    than leaving it stranded in claimed/ with no runner."""
+def yield_job(queue, name, rid, yield_to=None, host="", git=None, log=print,
+              reason=None):
+    """THE give-a-claim-back transition: git mv claimed/ -> jobs/, commit
+    `yield <rid>: ...`, push_or_rollback. True = the yield is recorded on
+    origin (caller ends the cycle). False = origin unreachable/refusing: the
+    rollback restored the CLAIM, and the caller proceeds to run the job rather
+    than leaving it stranded in claimed/ with no runner.
+
+    Two callers, ONE transition (§7.4: "follow the sanctioned yield/retry/
+    requeue path; invent no new transition"):
+    - Tier-1-always-first (§7.5) — pass `yield_to`, the runnable Tier-1 that
+      goes ahead. Wording unchanged, byte for byte; it is a fixtured contract
+      and the history greps for it.
+    - post-claim revalidation (§7.4) — pass `reason`, because availability
+      changed between polling and acquisition and this machine must not start
+      destructively. There is no second mechanism for it: §7.4 says the 90s
+      gui hold IS this rule's scheduling-class instance, so the same
+      transition records both. The commit message is the only difference,
+      which is exactly how much difference there is."""
     git = _bind(queue, git)
     git("mv", f"claimed/{name}", f"jobs/{name}")
-    git("commit", "-m", f"yield {rid}: runnable tier-1 {yield_to} goes first ({host})")
+    why = reason or f"runnable tier-1 {yield_to} goes first"
+    git("commit", "-m", f"yield {rid}: {why} ({host})")
     return push_or_rollback(queue, git, log=log)
 
 
