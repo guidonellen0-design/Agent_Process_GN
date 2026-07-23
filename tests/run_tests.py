@@ -23,6 +23,7 @@ import registry as reg                # noqa: E402
 import generic_executor as ge         # noqa: E402
 import budget_core as bc              # noqa: E402
 import adapter as ad                  # noqa: E402
+import capabilities as cap            # noqa: E402
 
 FAST = "--fast" in sys.argv[1:]
 RESULTS = []
@@ -505,6 +506,74 @@ check("adapter", "the boundary names stellaris-game WITHOUT importing anything",
           r"^\s*(?:import|from)\s+\S", open(os.path.join(_ROOT, "adapter.py"),
                                             encoding="utf-8").read(), __import__("re").M),
       "identity must not require the adapter's implementation to be present")
+
+# --- capability matching (Phase 7 increment 2, 2026-07-23) -----------------
+# `required_capabilities` shipped in job.v2/project/checks schemas in Phase 3
+# and was copied into the resolved plan by generic_executor — and compared
+# against NOTHING until now. These fixtures pin the comparison, and above all
+# the three-state rule: unknown is not the same as absent, and neither one
+# authorizes a start.
+_CAPS = {"git": True, "python": True, "claude-cli": False, "stellaris_game": None}
+
+check("caps", "names fold across - _ and case",
+      cap.canonical("claude-CLI") == cap.canonical("claude_cli")
+      == cap.canonical(" Claude CLI ") == "claude_cli")
+check("caps", "a hyphenated requirement matches an underscored capability",
+      cap.eligible(["claude-cli"], {"claude_cli": True})[0],
+      "the silent-never-matches defect this module exists to prevent")
+check("caps", "every requirement present = eligible",
+      cap.eligible(["git", "python"], _CAPS) == (True, ""))
+check("caps", "no requirements at all = eligible",
+      cap.eligible([], {})[0])
+
+_met, _absent, _unknown = cap.evaluate(
+    ["git", "claude_cli", "stellaris_game", "never_heard_of_it"], _CAPS)
+check("caps", "present / absent / unknown are three distinct buckets",
+      _met == ["git"] and _absent == ["claude_cli"]
+      and _unknown == ["stellaris_game", "never_heard_of_it"])
+check("caps", "a MISSING key and an explicit None are both unknown",
+      "stellaris_game" in _unknown and "never_heard_of_it" in _unknown)
+
+_ok, _why = cap.eligible(["claude_cli"], _CAPS)
+check("caps", "an absent capability is ineligible and says so",
+      not _ok and "missing capability" in _why and "claude_cli" in _why)
+_ok, _why = cap.eligible(["stellaris_game"], _CAPS)
+check("caps", "an UNDETERMINED capability is ineligible too (fail-safe)",
+      not _ok and "undetermined" in _why,
+      "a probe that could not answer must never authorize a destructive start")
+check("caps", "unknown is reported differently from absent",
+      "missing capability" not in _why,
+      "'cannot' and 'could not tell' are different operator actions")
+
+check("caps", "a decisive True is never overwritten by a later unknown",
+      cap.normalize_map({"claude-cli": True, "claude_cli": None})["claude_cli"]
+      is True)
+check("caps", "a decisive False is never overwritten by a later unknown",
+      cap.normalize_map({"claude-cli": False, "claude_cli": None})["claude_cli"]
+      is False)
+
+check("caps", "declared() reads the schema field, canonical and deduped",
+      cap.declared({"required_capabilities": ["Git", "git", "claude-cli"]})
+      == ["git", "claude_cli"])
+check("caps", "declared() tolerates absent / None / a bare string",
+      cap.declared({}) == [] and cap.declared({"required_capabilities": None}) == []
+      and cap.declared({"required_capabilities": "git"}) == ["git"])
+check("caps", "declared() on a None object is empty, never a raise",
+      cap.declared(None) == [])
+
+check("caps", "requirements() = what the job declares PLUS what its adapter adds",
+      cap.requirements({"required_capabilities": ["git"]},
+                       extra=["gui-automation", "git"])
+      == ["git", "gui_automation"],
+      "adapter extras are folded and deduped against the job's own list")
+check("caps", "requirements() with no extras is just the declaration",
+      cap.requirements({"required_capabilities": ["python"]}) == ["python"])
+check("caps", "the matcher stays generic — it imports nothing",
+      not __import__("re").findall(
+          r"^\s*(?:import|from)\s+\S",
+          open(os.path.join(_ROOT, "capabilities.py"), encoding="utf-8").read(),
+          __import__("re").M),
+      "§4.3: it must not learn what a tier, a screen or a rig is")
 
 
 if not FAST:
