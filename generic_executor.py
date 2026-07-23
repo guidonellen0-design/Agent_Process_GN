@@ -25,6 +25,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 
 import profile_runtime
@@ -132,24 +133,109 @@ def _grade(grading, per_check):
     return ("PASS", "success") if ok else ("FAIL", "test-failure")
 
 
-def _run_one(command, cwd, env, timeout_s, tail_bytes=4000):
+CANCEL_POLL_S = 5     # how often a running command re-asks should_cancel()
+
+
+def _run_one(command, cwd, env, timeout_s, tail_bytes=4000,
+             should_cancel=None, poll_s=CANCEL_POLL_S):
     """Run one approved command string in `cwd` under `env`. shell=True: the
     command comes from the project's approved checks.json (§3.6), not from a
-    job. Returns a per_check dict. A timeout marks the whole run timed-out."""
+    job. Returns a per_check dict. A timeout marks the whole run timed-out.
+
+    CANCELLATION (Phase 5, 2026-07-23 — the farm lane's half of gap G4): with
+    no `should_cancel` this is the original blocking subprocess.run, byte for
+    byte. With one, the command runs under Popen and the callable is re-asked
+    every `poll_s` seconds; True kills the process tree and marks the check
+    cancelled. The executor deliberately does NOT know WHAT cancellation is —
+    the caller owns that question (for the farm lane it is a queue marker),
+    which is what keeps this file project-agnostic (§4.3).
+
+    Why this existed for gui and not here: gap G4 was closed in 2026 for both
+    gui dispatch paths, but a farm job has always run to its timeout no matter
+    what — `stella` could publish a cancel marker and nothing read it."""
     start = time.time()
-    try:
-        r = subprocess.run(command, cwd=cwd, env=env, shell=True,
-                           capture_output=True, text=True,
-                           encoding="utf-8", errors="replace",
-                           timeout=timeout_s)
-        out = ((r.stdout or "") + (r.stderr or ""))
-        return {"command": command, "exit_code": r.returncode,
+    if should_cancel is None:
+        try:
+            r = subprocess.run(command, cwd=cwd, env=env, shell=True,
+                               capture_output=True, text=True,
+                               encoding="utf-8", errors="replace",
+                               timeout=timeout_s)
+            out = ((r.stdout or "") + (r.stderr or ""))
+            return {"command": command, "exit_code": r.returncode,
+                    "duration_s": round(time.time() - start, 2),
+                    "output_tail": out[-tail_bytes:], "timed_out": False}
+        except subprocess.TimeoutExpired:
+            return {"command": command, "exit_code": None,
+                    "duration_s": round(time.time() - start, 2),
+                    "output_tail": f"[TIMEOUT after {timeout_s}s]",
+                    "timed_out": True}
+
+    proc = subprocess.Popen(command, cwd=cwd, env=env, shell=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace")
+    chunks, cancelled, timed_out = [], False, False
+    reader = threading.Thread(target=_drain, args=(proc.stdout, chunks),
+                             daemon=True)
+    reader.start()
+    last_poll = time.time()
+    while proc.poll() is None:
+        time.sleep(0.2)
+        now = time.time()
+        if now - start > timeout_s:
+            timed_out = True
+            break
+        if now - last_poll >= poll_s:
+            last_poll = now
+            try:
+                cancelled = bool(should_cancel())
+            except Exception:          # noqa: BLE001 — a broken cancel probe
+                cancelled = False      # must never kill a healthy run
+            if cancelled:
+                break
+    if timed_out or cancelled:
+        _kill_tree(proc)
+    reader.join(timeout=2.0)
+    out = "".join(chunks)
+    if cancelled:
+        return {"command": command, "exit_code": None,
                 "duration_s": round(time.time() - start, 2),
-                "output_tail": out[-tail_bytes:], "timed_out": False}
-    except subprocess.TimeoutExpired:
+                "output_tail": (out[-tail_bytes:] + "\n[CANCELLED]").strip(),
+                "timed_out": False, "cancelled": True}
+    if timed_out:
         return {"command": command, "exit_code": None,
                 "duration_s": round(time.time() - start, 2),
                 "output_tail": f"[TIMEOUT after {timeout_s}s]", "timed_out": True}
+    return {"command": command, "exit_code": proc.returncode,
+            "duration_s": round(time.time() - start, 2),
+            "output_tail": out[-tail_bytes:], "timed_out": False}
+
+
+def _drain(stream, chunks):
+    try:
+        for line in stream:
+            chunks.append(line)
+    except (OSError, ValueError):
+        pass
+
+
+def _kill_tree(proc):
+    """Kill the shell AND what it spawned. shell=True means proc is the shell;
+    killing only it orphans the real command, which on Windows keeps running
+    and holds the worktree open — the cleanup then fails and the next job
+    inherits the mess. Best-effort: taskkill /T where available, plain kill
+    otherwise, and never raise (a failed kill must not lose the result)."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True, timeout=20)
+        else:
+            proc.kill()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
 
 
 def _collect_evidence(workdir, globs):
@@ -167,7 +253,7 @@ def _collect_evidence(workdir, globs):
 
 
 def execute(envelope, workdir, machine, project_doc=None, checks_doc=None,
-            clamp=(30, 3600), log=lambda *a: None):
+            clamp=(30, 3600), log=lambda *a: None, should_cancel=None):
     """Run one check profile and return a schema-v2 result envelope.
 
     envelope: the normalized job/local envelope — project_id, check_profile,
@@ -179,6 +265,12 @@ def execute(envelope, workdir, machine, project_doc=None, checks_doc=None,
       call) so this function is testable against a plain temp dir.
     project_doc/checks_doc: parsed .agentops manifests; read from the workdir
       when omitted.
+    should_cancel: optional zero-arg callable re-asked every CANCEL_POLL_S
+      while a command runs, and once between commands. True stops the run and
+      yields verdict CANCELLED / status "cancelled". Omitted = the original
+      blocking behaviour, unchanged. The executor never learns what
+      cancellation IS; the lane owns that (for the farm lane it is a queue
+      marker), which is what keeps this file project-agnostic (§4.3).
 
     Distinguishes the §5.4 taxonomy: profile-resolution-failure,
     isolation-policy-failure, timeout, test-failure, adapter-failure,
@@ -245,10 +337,21 @@ def execute(envelope, workdir, machine, project_doc=None, checks_doc=None,
     tmin = plan["timeout_minutes"]
     timeout_s = int(max(lo, min(hi, (tmin or lo / 60) * 60)))
     per_check = []
-    timed_out = False
+    timed_out = cancelled = False
     for cmd in plan["commands"]:
-        pc = _run_one(cmd, workdir, env, timeout_s)
+        # a cancel that arrives BETWEEN commands must not start the next one
+        if should_cancel is not None and per_check:
+            try:
+                if should_cancel():
+                    cancelled = True
+                    break
+            except Exception:          # noqa: BLE001 — see _run_one
+                pass
+        pc = _run_one(cmd, workdir, env, timeout_s, should_cancel=should_cancel)
         per_check.append(pc)
+        if pc.get("cancelled"):
+            cancelled = True
+            break
         if pc["timed_out"]:
             timed_out = True
             break
@@ -256,6 +359,11 @@ def execute(envelope, workdir, machine, project_doc=None, checks_doc=None,
     verdict, status = _grade(plan["grading"], per_check)
     if timed_out:
         verdict, status = "FAIL", "timeout"
+    # Cancellation outranks grading: a partial run's exit codes say nothing
+    # about the check. It is NOT a test-failure — the distinction matters to
+    # every reader that counts failures (§5.4 taxonomy).
+    if cancelled:
+        verdict, status = "CANCELLED", "cancelled"
 
     result.update({
         "verdict": verdict, "status": status,

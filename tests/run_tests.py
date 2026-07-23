@@ -371,6 +371,39 @@ check("budget", "healthy accounting reports no problem",
                          "parse_failures": 0}) is None)
 
 
+# --- farm-lane cancellation (Phase 5, 2026-07-23; gap G4's other half) -----
+# A generic job used to run to its timeout no matter what: gui dispatch has
+# honored cancel markers since Phase 2, the farm lane never did. The executor
+# stays project-agnostic — it asks a callable and never learns what
+# cancellation IS.
+_c_env, _ = ge.sanitized_env({"PATH": os.environ.get("PATH", "")})
+_slow = (sys.executable.replace("\\", "/")
+         + ' -c "import time; time.sleep(30)"')
+_pc = ge._run_one(_slow, _HERE, _c_env, timeout_s=60,
+                  should_cancel=lambda: True, poll_s=0.1)
+check("cancel", "a cancelled command stops early and is marked cancelled",
+      _pc.get("cancelled") and not _pc["timed_out"] and _pc["duration_s"] < 15,
+      str(_pc.get("duration_s")))
+check("cancel", "a cancelled command reports no exit code (it never finished)",
+      _pc["exit_code"] is None and "[CANCELLED]" in _pc["output_tail"])
+_quick = sys.executable.replace("\\", "/") + ' -c "print(42)"'
+_pc2 = ge._run_one(_quick, _HERE, _c_env, timeout_s=60,
+                   should_cancel=lambda: False, poll_s=0.1)
+check("cancel", "an uncancelled command still runs normally under the poll path",
+      _pc2["exit_code"] == 0 and "42" in _pc2["output_tail"]
+      and not _pc2.get("cancelled"))
+_pc3 = ge._run_one(_quick, _HERE, _c_env, timeout_s=60)
+check("cancel", "with NO should_cancel the original blocking path is used",
+      _pc3["exit_code"] == 0 and "cancelled" not in _pc3)
+def _boom():
+    raise RuntimeError("cancel probe is broken")
+_pc4 = ge._run_one(_quick, _HERE, _c_env, timeout_s=60,
+                   should_cancel=_boom, poll_s=0.1)
+check("cancel", "a BROKEN cancel probe never kills a healthy run",
+      _pc4["exit_code"] == 0 and not _pc4.get("cancelled"),
+      "failing toward killing jobs would be far worse than missing a cancel")
+
+
 # --- adapter boundary (Phase 5, 2026-07-23) --------------------------------
 # Identity + routing only: the framework names the Stellaris adapter without
 # importing it, which is the entire point of a boundary.

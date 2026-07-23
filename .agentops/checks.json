@@ -3,10 +3,18 @@
   "checks": {
     "fast": {
       "timeout_minutes": 5,
-      "commands": ["python tests/run_tests.py --fast"],
-      "grading": { "type": "exit-code" },
-      "required_capabilities": ["python"],
-      "evidence": ["tests/run_tests.py"]
+      "commands": [
+        "python tests/run_tests.py --fast"
+      ],
+      "grading": {
+        "type": "exit-code"
+      },
+      "required_capabilities": [
+        "python"
+      ],
+      "evidence": [
+        "tests/run_tests.py"
+      ]
     },
     "full": {
       "timeout_minutes": 10,
@@ -14,11 +22,31 @@
         "python tests/run_tests.py",
         "python -m py_compile profile_runtime.py registry.py generic_executor.py"
       ],
-      "grading": { "type": "all-commands-pass" },
-      "required_capabilities": ["python"],
+      "grading": {
+        "type": "all-commands-pass"
+      },
+      "required_capabilities": [
+        "python"
+      ],
       "amendable_fields": {
-        "operator_notes": { "type": "string", "description": "free-text run note; does not change commands or grading" }
+        "operator_notes": {
+          "type": "string",
+          "description": "free-text run note; does not change commands or grading"
+        }
       }
+    },
+    "cancellable": {
+      "timeout_minutes": 6,
+      "commands": [
+        "python -c \"import time; time.sleep(300); print('NOT CANCELLED')\""
+      ],
+      "grading": {
+        "type": "exit-code"
+      },
+      "required_capabilities": [
+        "python"
+      ],
+      "_why": "A deliberately long no-op, used ONLY to prove the cancellation path end-to-end on a live worker (Phase 5, 2026-07-23). The farm lane's cancel handling cannot be probed with fast/full \u2014 both finish in under a second, so a cancel marker can never race them. Expected outcome of a real cancel probe: verdict CANCELLED, status 'cancelled', exit_code null, well before the 6-minute timeout. If this profile ever PASSes, cancellation is BROKEN \u2014 it means the command ran to completion."
     }
   }
 }
