@@ -22,6 +22,7 @@ import profile_runtime as pr          # noqa: E402
 import registry as reg                # noqa: E402
 import generic_executor as ge         # noqa: E402
 import budget_core as bc              # noqa: E402
+import adapter as ad                  # noqa: E402
 
 FAST = "--fast" in sys.argv[1:]
 RESULTS = []
@@ -368,6 +369,41 @@ check("budget", "mostly-unparseable usage lines are a LOUD failure",
 check("budget", "healthy accounting reports no problem",
       bc.schema_problem({"usage_entries": 500, "offset": 500_000,
                          "parse_failures": 0}) is None)
+
+
+# --- adapter boundary (Phase 5, 2026-07-23) --------------------------------
+# Identity + routing only: the framework names the Stellaris adapter without
+# importing it, which is the entire point of a boundary.
+check("adapter", "both adapters are registered with id, version and repo",
+      set(ad.ADAPTERS) == {"generic-command", "stellaris-game"}
+      and all(a.version and a.in_repo for a in ad.ADAPTERS.values()))
+check("adapter", "the generic executor's id matches the registry",
+      ge.ADAPTER_ID == ad.GENERIC_ADAPTER_ID
+      and ad.ADAPTERS[ad.GENERIC_ADAPTER_ID].version == ge.ADAPTER_VERSION)
+check("adapter", "the legacy default matches the profile runtime",
+      ad.LEGACY_ADAPTER_ID == pr.LEGACY_ADAPTER_ID)
+check("adapter", "a job with no adapter_id is a legacy Stellaris job",
+      ad.resolve({}).adapter_id == ad.LEGACY_ADAPTER_ID,
+      "read-side normalization must never reinterpret archived jobs")
+check("adapter", "a declared adapter wins",
+      ad.resolve({"adapter_id": "generic-command"}).adapter_id
+      == "generic-command")
+check("adapter", "normalize is applied when given",
+      ad.resolve({"tier": "gui"}, pr.normalize_job).adapter_id
+      == ad.LEGACY_ADAPTER_ID)
+_unk = ad.resolve({"adapter_id": "not-a-real-adapter"})
+check("adapter", "an unknown adapter resolves rather than raising",
+      _unk.adapter_id == "not-a-real-adapter" and not ad.is_known(_unk))
+check("adapter", "an unknown adapter is assumed to own the machine",
+      _unk.owns_machine, "unknown capabilities must not skip resource gates")
+check("adapter", "owns_machine separates the two lanes",
+      ad.owns_machine({"adapter_id": "stellaris-game"})
+      and not ad.owns_machine({"adapter_id": "generic-command"}))
+check("adapter", "the boundary names stellaris-game WITHOUT importing anything",
+      not __import__("re").findall(
+          r"^\s*(?:import|from)\s+\S", open(os.path.join(_ROOT, "adapter.py"),
+                                            encoding="utf-8").read(), __import__("re").M),
+      "identity must not require the adapter's implementation to be present")
 
 
 if not FAST:

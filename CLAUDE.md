@@ -41,6 +41,14 @@ test suite through its own generic executor.
   harness keeps `schemas/CONTRACTS.md` alone (gui-metrics.csv columns, Slack
   line shapes: adapter knowledge, §4.3), and a fixture fails if any schema
   reappears there.
+- `adapter.py` — **NEW in Phase 5 (2026-07-23):** THE adapter boundary —
+  which adapters exist, their versions, which one owns a given job, and
+  whether a run takes exclusive machine resources (`owns_machine`). It names
+  `stellaris-game` WITHOUT importing it, which is the whole point: the
+  framework routes by descriptor, the harness supplies the implementation.
+  Imports nothing (asserted by a fixture). An unknown adapter_id resolves to
+  a descriptor with `known=False` rather than raising — a claimed job must
+  always reach a verdict.
 - `budget_core.py` — **CANONICAL as of Phase 4 (2026-07-23):** session-budget
   accounting and attribution — the weighted metric, incremental transcript
   ingest (main + subagent sidechains, which bill to the PARENT session),
