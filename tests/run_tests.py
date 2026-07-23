@@ -335,6 +335,21 @@ try:
     _baton({"session": "", "released_by": "HOSTX/abcd1234", "released_at": "junk"})
     check("budget", "an unreadable release stamp fails toward FINISHING the handoff",
           bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX", cfg=_bcfg))
+    # scope (Phase 6): the guard and the budget core MUST read a baton the same
+    # way, or a session holds process authority for one and not the other.
+    _baton({"session": "HOSTX/abcd1234", "scope": "process"})
+    check("budget", "an explicit process scope grants the role cap",
+          bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX"))
+    _baton({"session": "HOSTX/abcd1234"})
+    check("budget", "an ABSENT scope reads as process (every pre-2026-07-23 baton)",
+          bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX"),
+          "reading old batons as unscoped would lock out the sitting master")
+    _baton({"session": "HOSTX/abcd1234", "scope": "project"})
+    check("budget", "a NON-process scope grants no role cap (no project batons)",
+          not bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX"))
+    _baton({"session": "HOSTX/abcd1234", "scope": "something-newer"})
+    check("budget", "an UNRECOGNIZED scope grants nothing (safe reading)",
+          not bc.is_baton_holder(_qd, "abcd1234-rest", host="HOSTX"))
 finally:
     shutil.rmtree(_btmp, ignore_errors=True)
 

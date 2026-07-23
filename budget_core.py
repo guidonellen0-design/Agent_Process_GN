@@ -251,6 +251,17 @@ def load_override(override_dir, sid):
 
 # -------------------------------------------------------------------- role ---
 
+PROCESS_SCOPE = "process"   # must match stella_guard / stella_queue
+
+
+def baton_scope(doc):
+    """What a baton authorizes; ABSENT means 'process' (every baton written
+    before 2026-07-23 omits the field). Same reading as the guard's — the two
+    MUST agree, or a session could hold process authority for the guard and not
+    for its budget cap, which is the "budget and guards agree" proof point."""
+    return (doc or {}).get("scope", PROCESS_SCOPE)
+
+
 def is_baton_holder(queue_dir, sid, host=None, cfg=None):
     """Does this session hold the process baton (and therefore the role cap)?
 
@@ -267,6 +278,8 @@ def is_baton_holder(queue_dir, sid, host=None, cfg=None):
         baton = _read_json(os.path.join(queue_dir, "feedback", "BATON.json"))
     except (OSError, ValueError):
         return False
+    if baton_scope(baton) != PROCESS_SCOPE:
+        return False        # a baton of unknown scope grants no role cap
     if host is None:
         host = os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or ""
     me = f"{host}/{(sid or '')[:8]}"
