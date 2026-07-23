@@ -371,6 +371,25 @@ check("budget", "healthy accounting reports no problem",
                          "parse_failures": 0}) is None)
 
 
+# --- envelope integrity (Phase 5, 2026-07-23) ------------------------------
+# A job asserts a (project_id, repo) PAIRING. The worker stages whatever `repo`
+# says and resolves whatever `project_id` says — so an unchecked pairing runs
+# one project's identity against another project's tree. corresponds() is the
+# check; it existed from Phase 1 but was only ever called at submit time.
+_creg = {"schema_version": 2, "projects": {
+    "agentops-core": {"repo": "_agent_process"},
+    "SomeMod_GN": {"repo": "SomeMod_GN"}}}
+check("envelope", "a correct pairing corresponds",
+      reg.corresponds(_creg, "agentops-core", "_agent_process"))
+check("envelope", "a CROSSED pairing does not",
+      not reg.corresponds(_creg, "agentops-core", "SomeMod_GN"),
+      "this is the pairing that would run one project's checks in another tree")
+check("envelope", "an implicit repo (project_id == repo) corresponds",
+      reg.corresponds(_creg, "SomeMod_GN", "SomeMod_GN"))
+check("envelope", "an unregistered project never corresponds",
+      not reg.corresponds(_creg, "ghost-project", "_agent_process"))
+
+
 # --- timeout translation (Phase 5, 2026-07-23) -----------------------------
 # A generic job's timeout belongs to the RECIPE, not the run: timeout_minutes
 # lives in checks.json and is therefore inside effective_profile_hash. Before
