@@ -29,7 +29,13 @@ test suite through its own generic executor.
   commands in a sanitized environment → grade → schema-v2 result envelope.
 - `registry.py` + `registry.json` — the evolved (v2) project registry
   (known-mod-repos.json's successor; both shapes accepted meanwhile).
-- `schemas/` — the versioned contracts (copied from the harness in Phase 1).
+- `schemas/` — **CANONICAL as of Phase 4 (2026-07-23):** the versioned JSON
+  contracts (`job.v2`, `result.v2`, `project`, `checks`) plus the binding
+  rules. The Phase-1 harness copies are DELETED, not shimmed — a schema file
+  is data, so the fix for a byte-copy is one file, not an import alias. The
+  harness keeps `schemas/CONTRACTS.md` alone (gui-metrics.csv columns, Slack
+  line shapes: adapter knowledge, §4.3), and a fixture fails if any schema
+  reappears there.
 - `run_local.py` — the local lane: generate a local envelope, call the SAME
   generic executor as the farm lane.
 - `tests/run_tests.py` — this project's real tests (the dogfood pilot's

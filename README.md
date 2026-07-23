@@ -28,12 +28,14 @@ _agent_process/
 ├── profile_runtime.py     # resolver + canonical hash + amendments + validation
 ├── generic_executor.py    # resolve → sanitized run → grade → schema-v2 result
 ├── registry.py / .json    # evolved v2 project registry (known-mod-repos successor)
-├── schemas/               # versioned JSON contracts
+├── schemas/               # versioned JSON contracts (CANONICAL, Phase 4)
 ├── run_local.py           # local lane entry
 ├── tests/run_tests.py     # this project's real tests (the dogfood pilot)
 ├── .agentops/             # project.json + checks.json (fast, full)
 └── CLAUDE.md              # project policy
 ```
 
-See `CLAUDE.md` for policy and the transitional-duplication note (the harness
-keeps its own `profile_runtime.py` until Phase 4 aliases this one).
+See `CLAUDE.md` for policy. As of Phase 4 the transitional duplication is
+gone: `profile_runtime.py`, `queue_protocol.py`, `winos.py` and `schemas/` are
+canonical HERE — the harness carries import shims for the modules and nothing
+at all for the schemas.
