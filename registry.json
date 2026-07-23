@@ -1,12 +1,19 @@
 {
   "_readme": [
-    "The evolved multi-project registry (design doc §3.5) — known-mod-repos.json's",
-    "v2 successor. PROJECT-SESSION-WRITABLE (baton-exempt): onboarding a project",
-    "never requires the design master. No secrets, no machine paths (those live in",
-    "machine-local *.local sidecars mapping project_id -> clone path/creds).",
-    "Phase 3: this is the skeleton's canonical registry; the harness keeps its",
-    "legacy flat known-mod-repos.json until Phase 4 merges them. Readers already",
-    "accept both shapes (profile_runtime._registry_corresponds)."
+    "THE project registry (design doc \u00a73.5) \u2014 known-mod-repos.json's v2 successor,",
+    "consolidated 2026-07-23 (Phase 4). Two jobs, one file: (a) project discovery",
+    "for the multi-project framework, and (b) the reviewed AUTO-CLONE ALLOWLIST the",
+    "worker consults \u2014 a repo absent here is never cloned by name, and that refusal",
+    "is a safety property (REMOTE-TESTING.md 'No auto-clone'), not a bug.",
+    "PROJECT-SESSION-WRITABLE (baton-exempt): onboarding a project, or adding a mod",
+    "repo you have started work on, never requires the design master \u2014 add the entry,",
+    "commit + push, and every worker picks it up on its next ff-pull.",
+    "No secrets, no machine paths (those live in machine-local *.local sidecars",
+    "mapping project_id -> clone path/creds). Readers accept the legacy flat shape",
+    "too (profile_runtime._registry_corresponds), so old job files still validate.",
+    "NOTE: the framework peer's own clone URL is NOT read from here \u2014 it is a",
+    "git-reviewed constant in the harness's _agentops_bootstrap.py, because this",
+    "file lives inside the repo that bootstrap has to clone."
   ],
   "schema_version": 2,
   "projects": {
@@ -16,6 +23,146 @@
       "adapter_id": "generic-command",
       "manifest_path": ".agentops/project.json",
       "checks_path": ".agentops/checks.json"
+    },
+    "AI_Empire_Freeze_GN": {
+      "repo": "AI_Empire_Freeze_GN",
+      "remote": "https://github.com/guidonellen0-design/AI_Empire_Freeze_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "CivilWarsAILite_GN": {
+      "repo": "CivilWarsAILite_GN",
+      "remote": "https://github.com/guidonellen0-design/CivilWarsAILite_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "DistrictOverhaul_GN": {
+      "repo": "DistrictOverhaul_GN",
+      "remote": "https://github.com/guidonellen0-design/DistrictOverhaul_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "EarlySpaceAge_GN": {
+      "repo": "EarlySpaceAge_GN",
+      "remote": "https://github.com/guidonellen0-design/EarlySpaceAge_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "EvolvingHyperlanes_GN": {
+      "repo": "EvolvingHyperlanes_GN",
+      "remote": "https://github.com/guidonellen0-design/EvolvingHyperlanes_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "FlogisGalaxySizesFast_GN": {
+      "repo": "FlogisGalaxySizesFast_GN",
+      "remote": "https://github.com/guidonellen0-design/FlogisGalaxySizesFast_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "General_Fixes_44_GN": {
+      "repo": "General_Fixes_44_GN",
+      "remote": "https://github.com/guidonellen0-design/General_Fixes_44_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "GigaClosePairMegas_GN": {
+      "repo": "GigaClosePairMegas_GN",
+      "remote": "https://github.com/guidonellen0-design/GigaClosePairMegas_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "GuilliExplorationAddon_GN": {
+      "repo": "GuilliExplorationAddon_GN",
+      "remote": "https://github.com/guidonellen0-design/GuilliExplorationAddon_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "Guillis_Exploration_And_Expansion_Tweaks_GN": {
+      "repo": "Guillis_Exploration_And_Expansion_Tweaks_GN",
+      "remote": "https://github.com/guidonellen0-design/Guillis_Exploration_And_Expansion_Tweaks_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "HyperlaneRegrowth_GN": {
+      "repo": "HyperlaneRegrowth_GN",
+      "remote": "https://github.com/guidonellen0-design/HyperlaneRegrowth_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "LateFallenEmpireContact_GN": {
+      "repo": "LateFallenEmpireContact_GN",
+      "remote": "https://github.com/guidonellen0-design/LateFallenEmpireContact_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "LessPrimitives_GN": {
+      "repo": "LessPrimitives_GN",
+      "remote": "https://github.com/guidonellen0-design/LessPrimitives_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "LifeBeyond_PD_CompatPatch_GN": {
+      "repo": "LifeBeyond_PD_CompatPatch_GN",
+      "remote": "https://github.com/guidonellen0-design/LifeBeyond_PD_CompatPatch_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "MakeTallPlayable_GN": {
+      "repo": "MakeTallPlayable_GN",
+      "remote": "https://github.com/guidonellen0-design/MakeTallPlayable_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "MakeTallPlayable_PDExotic_CompatPatch_GN": {
+      "repo": "MakeTallPlayable_PDExotic_CompatPatch_GN",
+      "remote": "https://github.com/guidonellen0-design/MakeTallPlayable_PDExotic_CompatPatch_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "MoreTerraformCandidates_GN": {
+      "repo": "MoreTerraformCandidates_GN",
+      "remote": "https://github.com/guidonellen0-design/MoreTerraformCandidates_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "PDAIDomes_GN": {
+      "repo": "PDAIDomes_GN",
+      "remote": "https://github.com/guidonellen0-design/PDAIDomes_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "PDDomedColonyTweaks_GN": {
+      "repo": "PDDomedColonyTweaks_GN",
+      "remote": "https://github.com/guidonellen0-design/PDDomedColonyTweaks_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "RealSpace_PD_CompatPatch_GN": {
+      "repo": "RealSpace_PD_CompatPatch_GN",
+      "remote": "https://github.com/guidonellen0-design/RealSpace_PD_CompatPatch_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "Rebalanced_TechTiers_Traditions_GN": {
+      "repo": "Rebalanced_TechTiers_Traditions_GN",
+      "remote": "https://github.com/guidonellen0-design/Rebalanced_TechTiers_Traditions_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "RFTS_SpeciesNames_GN": {
+      "repo": "RFTS_SpeciesNames_GN",
+      "remote": "https://github.com/guidonellen0-design/RFTS_SpeciesNames_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "RSPD_ChimeraProbe_GN": {
+      "repo": "RSPD_ChimeraProbe_GN",
+      "remote": "https://github.com/guidonellen0-design/RSPD_ChimeraProbe_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "Superstructures_GN": {
+      "repo": "Superstructures_GN",
+      "remote": "https://github.com/guidonellen0-design/Superstructures_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "TerraformableSolSystem_GN": {
+      "repo": "TerraformableSolSystem_GN",
+      "remote": "https://github.com/guidonellen0-design/TerraformableSolSystem_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "TheBelt_GN": {
+      "repo": "TheBelt_GN",
+      "remote": "https://github.com/guidonellen0-design/TheBelt_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "TrueAliens_Updated_GN": {
+      "repo": "TrueAliens_Updated_GN",
+      "remote": "https://github.com/guidonellen0-design/TrueAliens_Updated_GN.git",
+      "adapter_id": "stellaris-game"
+    },
+    "Unique_Ascenscion_Perks_GN": {
+      "repo": "Unique_Ascenscion_Perks_GN",
+      "remote": "https://github.com/guidonellen0-design/unique-ascension-perks-minimal-gn.git",
+      "adapter_id": "stellaris-game"
     }
   }
 }

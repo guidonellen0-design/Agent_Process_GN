@@ -64,6 +64,37 @@ def corresponds(registry, project_id, repo):
     return profile_runtime._registry_corresponds(registry, project_id, repo)
 
 
+def remote_for_repo(registry, repo):
+    """The reviewed clone URL for a REPO name, or None when the repo is not
+    allowlisted. This is the auto-clone allowlist lookup the worker used to do
+    against the flat known-mod-repos.json (consolidated here 2026-07-23).
+
+    Keyed by repo, not project_id, on purpose: the worker clones a directory
+    named after the repo, and one project may map to a differently-named repo
+    (agentops-core -> _agent_process). Both registry shapes are accepted, so a
+    machine still carrying a legacy flat file resolves identically."""
+    if not repo:
+        return None
+    if isinstance(registry, dict) and registry.get("schema_version") == 2:
+        for pid, entry in (registry.get("projects") or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            if (entry.get("repo") or pid) == repo:
+                return entry.get("remote") or None
+        return None
+    val = (registry or {}).get(repo)
+    if not val or repo.startswith("_comment"):
+        return None
+    return val if isinstance(val, str) else None
+
+
+def is_allowlisted(registry, repo):
+    """True when the worker may auto-clone `repo` by name. A registry that
+    could not be read is the caller's problem (validate_job fails OPEN on an
+    unreadable registry — an unavailable file must not block submission)."""
+    return remote_for_repo(registry, repo) is not None
+
+
 def config_paths(entry):
     """(manifest_path, checks_path) for a resolved entry, with defaults."""
     entry = entry or {}

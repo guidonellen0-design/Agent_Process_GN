@@ -28,7 +28,12 @@ test suite through its own generic executor.
 - `generic_executor.py` — project-agnostic: resolve a profile → run approved
   commands in a sanitized environment → grade → schema-v2 result envelope.
 - `registry.py` + `registry.json` — the evolved (v2) project registry
-  (known-mod-repos.json's successor; both shapes accepted meanwhile).
+  — **CANONICAL and CONSOLIDATED as of Phase 4 (2026-07-23):** the harness's
+  flat `known-mod-repos.json` merged in here, so ONE file does project
+  discovery AND the worker's reviewed auto-clone allowlist
+  (`remote_for_repo` / `is_allowlisted`). Both shapes still parse, so old
+  job files validate unchanged. Stays project-session-writable — this repo
+  is ungated, so onboarding never needs the design master.
 - `schemas/` — **CANONICAL as of Phase 4 (2026-07-23):** the versioned JSON
   contracts (`job.v2`, `result.v2`, `project`, `checks`) plus the binding
   rules. The Phase-1 harness copies are DELETED, not shimmed — a schema file

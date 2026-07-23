@@ -27,7 +27,7 @@ taxonomy (environment differences are permitted and reported).
 _agent_process/
 ├── profile_runtime.py     # resolver + canonical hash + amendments + validation
 ├── generic_executor.py    # resolve → sanitized run → grade → schema-v2 result
-├── registry.py / .json    # evolved v2 project registry (known-mod-repos successor)
+├── registry.py / .json    # THE project registry + auto-clone allowlist
 ├── schemas/               # versioned JSON contracts (CANONICAL, Phase 4)
 ├── run_local.py           # local lane entry
 ├── tests/run_tests.py     # this project's real tests (the dogfood pilot)

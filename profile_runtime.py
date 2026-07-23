@@ -277,7 +277,7 @@ def validate_checks(d):
 
 def validate_v2_job_fields(job, registry=None):
     """Extra validation for jobs declaring schema_version 2. Additive: v1
-    jobs never reach this. `registry` is the parsed known-mod-repos.json
+    jobs never reach this. `registry` is the parsed project registry
     (or None to skip the correspondence check). Returns (ok, problems)."""
     problems = []
     pid = job.get("project_id")
@@ -315,7 +315,7 @@ def validate_v2_job_fields(job, registry=None):
     if pid and job.get("repo") and registry is not None:
         if not _registry_corresponds(registry, pid, job.get("repo")):
             problems.append("v2 job: project_id %r does not correspond to "
-                            "repo %r in known-mod-repos.json" %
+                            "repo %r in the project registry" %
                             (pid, job.get("repo")))
     return (not problems, problems)
 

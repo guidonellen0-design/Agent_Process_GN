@@ -95,11 +95,45 @@ check("reg", "corresponds: mismatch rejected",
 _mp, _cp = reg.config_paths(_e)
 check("reg", "config_paths returns manifest+checks",
       _mp == ".agentops/project.json" and _cp == ".agentops/checks.json")
-# the ACTUAL registry file resolves the pilot
+# remote_for_repo / is_allowlisted: the auto-clone allowlist lookup that used to
+# be a flat known-mod-repos.json read on the harness side (consolidated here
+# 2026-07-23). Keyed by REPO, not project_id — the worker clones a directory
+# named after the repo, and the two differ (agentops-core -> _agent_process).
+_alreg = {"schema_version": 2, "projects": {
+    "agentops-core": {"repo": "_agent_process", "remote": "https://x/fw.git"},
+    "SomeMod_GN": {"repo": "SomeMod_GN", "remote": "https://x/mod.git"},
+    "NoRemote_GN": {"repo": "NoRemote_GN"}}}
+check("reg", "remote_for_repo: repo == project_id",
+      reg.remote_for_repo(_alreg, "SomeMod_GN") == "https://x/mod.git")
+check("reg", "remote_for_repo: repo differs from project_id",
+      reg.remote_for_repo(_alreg, "_agent_process") == "https://x/fw.git")
+check("reg", "remote_for_repo: project_id is NOT a repo name",
+      reg.remote_for_repo(_alreg, "agentops-core") is None)
+check("reg", "remote_for_repo: unlisted repo -> None (never auto-cloned)",
+      reg.remote_for_repo(_alreg, "Unlisted_GN") is None)
+check("reg", "remote_for_repo: entry without a remote is not clonable",
+      reg.remote_for_repo(_alreg, "NoRemote_GN") is None)
+check("reg", "remote_for_repo: legacy flat shape still resolves",
+      reg.remote_for_repo({"SomeRepo": "https://x/y.git"}, "SomeRepo")
+      == "https://x/y.git")
+check("reg", "remote_for_repo: the flat _comment key is not a repo",
+      reg.remote_for_repo({"_comment": "blah"}, "_comment") is None)
+check("reg", "is_allowlisted mirrors remote_for_repo",
+      reg.is_allowlisted(_alreg, "SomeMod_GN")
+      and not reg.is_allowlisted(_alreg, "Unlisted_GN"))
+# the ACTUAL registry file resolves the pilot AND carries the merged allowlist
 _realreg = reg.load()
 check("reg", "shipped registry.json resolves agentops-core",
       (reg.resolve(_realreg, "agentops-core") or {}).get("adapter_id")
       == "generic-command")
+check("reg", "shipped registry.json is the merged allowlist (mod repos present)",
+      sum(1 for e in _realreg["projects"].values()
+          if e.get("adapter_id") == "stellaris-game") >= 25,
+      str(len(_realreg["projects"])))
+check("reg", "every shipped entry carries a clonable remote",
+      all(reg.remote_for_repo(_realreg, e.get("repo") or p)
+          for p, e in _realreg["projects"].items()),
+      "an entry with no remote cannot be auto-cloned and silently refuses")
 
 
 # --- generic_executor (pure) ----------------------------------------------
